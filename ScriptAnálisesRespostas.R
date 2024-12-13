@@ -1,6 +1,6 @@
-####===================================
+####=============================
 #### Trabalho Mariana - Análises
-####===================================
+####=============================
 ####=============================
 #### Preparando o R para análise
 ####=============================
@@ -14,12 +14,6 @@ tryCatch({setwd("C:/Users/cesar_macieira/Desktop/Usiminas/Nescon/qualidade-teles
 if(!require(openxlsx)){ install.packages("openxlsx"); require(openxlsx)}#Ler e exportar excel
 if(!require(purrr)){ install.packages("purrr"); require(purrr)}#Programação funcional
 if(!require(tidyverse)){ install.packages("tidyverse"); require(tidyverse)}#Manipulação de dados
-if(!require(irr)){ install.packages("irr"); require(irr) }
-if(!require(psych)){install.packages("psych"); require(psych)}
-if(!require(psy)){install.packages("psy"); require(psy)}
-if(!require(nFactors)){install.packages("nFactors"); require(nFactors)}
-if(!require(DescTools)){install.packages("DescTools"); require(DescTools)}
-#if(!require(Hmisc)){install.packages("Hmisc"); require(Hmisc)}
 
 ####=========
 #### Funções
@@ -343,270 +337,55 @@ TabelaGLMMBeta = function(modelo){
   return(Tabela)
 }
 
-icc.kappa1 <- function(x, y){
-  D <- data.frame(x, y)
-  y1<- irr::icc(D, model="twoway", type="agreement", unit="single")
-  y2<- irr::icc(D, model="twoway", type="agreement", unit="average")
-  k <- kappa2(cbind(x,y), weight = "squared")$value
-  c(Val1(D)[3], y1$value, y2$value, k)
-}
-
-icc.kappa2 <- function(x, y, z, w, t, s){
-  D <- data.frame(x, y, z, w, t, s)
-  y1<- irr::icc(D, model="twoway", type="agreement", unit="single")
-  y2<- irr::icc(D, model="twoway", type="agreement", unit="average")
-  k <- kappam.fleiss(cbind(x, y, z, w, t, s), exact = T, detail = FALSE)$value
-  c(Val1(D)[3], y1$value, y2$value, k)
-}
-
-icc.kappa3 <- function(x, y, z, w){
-  D <- data.frame(x, y, z, w)
-  y1<- irr::icc(D, model="twoway", type="agreement", unit="single")
-  y2<- irr::icc(D, model="twoway", type="agreement", unit="average")
-  k <- kappam.fleiss(cbind(x, y, z, w), exact = T, detail = FALSE)$value
-  c(Val1(D)[3], y1$value, y2$value, k)
-}
-
 ####=============================
 #### Carregando o banco de dados 
 ####=============================
-dados = tryCatch({read.xlsx("C:/Users/cesar_macieira/Desktop/Usiminas/Nescon/qualidade-telessaude/questionário para avaliadores final.xlsx", sheet = 3)},
-                 error = function(e) {read.xlsx("D:/NESCON/Trabalho - Mariana/qualidade-telessaude/questionário para avaliadores final.xlsx", sheet = 3)})
-dados_relevancia = dados %>% filter(Tipo.de.avaliação == 'Relevância')
-dados_clareza = dados %>% filter(Tipo.de.avaliação == 'Clareza')
+dados = tryCatch({read.xlsx("C:/Users/cesar_macieira/Desktop/Usiminas/Nescon/qualidade-telessaude/Dados respostas questionários 12-12-2024.xlsx", sheet = 1)},
+                 error = function(e) {read.xlsx("D:/NESCON/Trabalho - Mariana/qualidade-telessaude/Dados respostas questionários 12-12-2024.xlsx", sheet = 1)})
+
+####=====================
+#### Tratamento de dados
+####=====================
+dados$País = trimws(tolower(gsub("\\s*\\(.*?\\)", "", dados$`Estado(ou.País.para.extrangeiros)`)))
+dados$País = gsub("^m[eé]xico.*", "México", dados$País, ignore.case = TRUE)
+dados$País = gsub("^brasil.*", "Brasil", dados$País, ignore.case = TRUE)
+dados$País = gsub("^per[uú].*", "Perú", dados$País, ignore.case = TRUE)
+dados$País = gsub("^chile.*", "Chile", dados$País, ignore.case = TRUE)
+
+df1 = dados %>% select(País,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14,Q15,
+                       Q16,Q17,Q18,Q19,Q20,Q21,Q22,Q23,Q24,Q25,Q26,Q27,
+                       Q28,Q29,Q30,Q31,Q32,Q33,Q34,Q35,Q36,Q37,Q38,Q39,Q40,Q41,Q42,Q43,Q44,Q45,Q46,Q47,Q48,Q49,
+                       Q50,Q51,Q52,Q53,Q54,Q55,Q56,Q57,Q58,Q59,Q60,Q61,Q62)
+
+dicionario_respostas <- list(
+  "Sí" = "Sim",
+  "No" = "Não",
+  "Establecimientos, instalaciones e infraestructura requeridos o involucrados" = "Estabelecimentos, instalações e infraestrutura necessários ou envolvidos",
+  "Disponibilidad de especialistas" = "Disponibilidade de especialistas",
+  "Personal clínico local" = "Equipe clínica local",
+  "Horarios y días de disponibilidad" = "Horários e dias de disponibilidade",
+  "Horarios y días de disponibilidad, Horarios y días de indisponibilidad" = "Horários e dias de disponibilidade, Horários e dias de indisponibilidade",
+  "Ninguno de los dos" = "Nenhum dos dois"
+)
+
+# Função para codificar respostas
+codificar_respostas <- function(resposta) {
+  return(ifelse(resposta %in% names(dicionario_respostas), 
+                dicionario_respostas[[resposta]], 
+                resposta))
+}
+
+# Aplicar a codificação para todas as colunas começadas com 'Q'
+dados_codificados <- df1 %>%
+  mutate(across(starts_with("Q"), ~ sapply(., codificar_respostas)))
 
 ####====================
 #### Análise descritiva
 ####====================
-calcular_ivc = function(data) {
-  data %>% rowwise() %>% mutate(IVC = sum(c_across(J1:J6) == 3)/6) %>% ungroup() %>% select(Assunto, Questão, IVC)
-}
-
-ivc_relevancia = calcular_ivc(dados_relevancia)
-ivc_clareza = calcular_ivc(dados_clareza)
-
-ivc_combined = ivc_relevancia %>% rename(IVC_Relevancia = IVC) %>% 
-  left_join(ivc_clareza %>% rename(IVC_Clareza = IVC), by = c("Assunto", "Questão"))
-ivc_combined %>% as.data.frame()
-
-###==============
-### Intra e Inter
-###==============
-
-AV1 <- Dados2 %>% filter(Avaliacao=="AV1")
-AV2 <- Dados2 %>% filter(Avaliacao=="AV2")
-
-AV1.2 <- full_join(AV1, AV2, by=c("ID", "Avaliador", "Tempo"))
-
-D.NCR3 <- Dados2 %>% filter(Avaliador=="NCR3")
-D.NCR2 <- Dados2 %>% filter(Avaliador=="NCR2")
-D.R4 <- Dados2 %>% filter(Avaliador=="R4")
-D.R3 <- Dados2 %>% filter(Avaliador=="R3")
-D.R2 <- Dados2 %>% filter(Avaliador=="R2")
-D.R1 <- Dados2 %>% filter(Avaliador=="R1")
-
-rbind(
-icc.kappa1(AV1.2$Superior.x, AV1.2$Superior.y)
-,icc.kappa2(D.NCR3$Superior, D.NCR2$Superior, D.R4$Superior, 
-           D.R3$Superior, D.R2$Superior, D.R1$Superior)
-,icc.kappa1(AV1.2$Inferior.x, AV1.2$Inferior.y)
-,icc.kappa2(D.NCR3$Inferior, D.NCR2$Inferior, D.R4$Inferior, 
-           D.R3$Inferior, D.R2$Inferior, D.R1$Inferior)
-,icc.kappa1(AV1.2$Lateral.x, AV1.2$Lateral.y)
-,icc.kappa2(D.NCR3$Lateral, D.NCR2$Lateral, D.R4$Lateral, 
-           D.R3$Lateral, D.R2$Lateral, D.R1$Lateral)
-,icc.kappa1(AV1.2$Mesencefalo.x, AV1.2$Mesencefalo.y)
-,icc.kappa2(D.NCR3$Mesencefalo, D.NCR2$Mesencefalo, D.R4$Mesencefalo, 
-           D.R3$Mesencefalo, D.R2$Mesencefalo, D.R1$Mesencefalo)
-,icc.kappa1(AV1.2$Ponte.Bulbo.x, AV1.2$Ponte.Bulbo.y)
-,icc.kappa2(D.NCR3$Ponte.Bulbo, D.NCR2$Ponte.Bulbo, D.R4$Ponte.Bulbo, 
-           D.R3$Ponte.Bulbo, D.R2$Ponte.Bulbo, D.R1$Ponte.Bulbo)
-,icc.kappa1(AV1.2$Cerebelo.x, AV1.2$Cerebelo.y)
-,icc.kappa2(D.NCR3$Cerebelo, D.NCR2$Cerebelo, D.R4$Cerebelo, 
-           D.R3$Cerebelo, D.R2$Cerebelo, D.R1$Cerebelo)
-,icc.kappa1(AV1.2$Extensao.x, AV1.2$Extensao.y)
-,icc.kappa2(D.NCR3$Extensao, D.NCR2$Extensao, D.R4$Extensao, 
-           D.R3$Extensao, D.R2$Extensao, D.R1$Extensao)
-,icc.kappa1(AV1.2$Comp.x, AV1.2$Comp.y)
-,icc.kappa2(D.NCR3$Comp, D.NCR2$Comp, D.R4$Comp, 
-           D.R3$Comp, D.R2$Comp, D.R1$Comp)
-,icc.kappa1(AV1.2$Total.x, AV1.2$Total.y)
-,icc.kappa2(D.NCR3$Total, D.NCR2$Total, D.R4$Total, 
-           D.R3$Total, D.R2$Total, D.R1$Total))
-
-###==================
-### solicita??o 24/04
-###==================
-
-Dados3 <- Dados2 %>% filter(Avaliador!="R1"&Avaliador!="R3")
-
-AV1.B <- Dados3 %>% filter(Avaliacao=="AV1")
-AV2.B <- Dados3 %>% filter(Avaliacao=="AV2")
-
-AV1.2.B <- full_join(AV1.B, AV2.B, by=c("ID", "Avaliador", "Tempo"))
-
-rbind(
-  icc.kappa1(AV1.2.B$Superior.x, AV1.2.B$Superior.y)
-  ,icc.kappa3(D.NCR3$Superior, D.NCR2$Superior, D.R4$Superior, D.R2$Superior)
-  
-  ,icc.kappa1(AV1.2.B$Inferior.x, AV1.2.B$Inferior.y)
-  ,icc.kappa3(D.NCR3$Inferior, D.NCR2$Inferior, D.R4$Inferior, D.R2$Inferior)
-  
-  ,icc.kappa1(AV1.2.B$Lateral.x, AV1.2.B$Lateral.y)
-  ,icc.kappa3(D.NCR3$Lateral, D.NCR2$Lateral, D.R4$Lateral,D.R2$Lateral)
-  
-  ,icc.kappa1(AV1.2.B$Mesencefalo.x, AV1.2.B$Mesencefalo.y)
-  ,icc.kappa3(D.NCR3$Mesencefalo, D.NCR2$Mesencefalo, D.R4$Mesencefalo, D.R2$Mesencefalo)
-  
-  ,icc.kappa1(AV1.2.B$Ponte.Bulbo.x, AV1.2.B$Ponte.Bulbo.y)
-  ,icc.kappa3(D.NCR3$Ponte.Bulbo, D.NCR2$Ponte.Bulbo, D.R4$Ponte.Bulbo, D.R2$Ponte.Bulbo)
-  
-  ,icc.kappa1(AV1.2.B$Cerebelo.x, AV1.2.B$Cerebelo.y)
-  ,icc.kappa3(D.NCR3$Cerebelo, D.NCR2$Cerebelo, D.R4$Cerebelo, D.R2$Cerebelo)
-  
-  ,icc.kappa1(AV1.2.B$Extensao.x, AV1.2.B$Extensao.y)
-  ,icc.kappa3(D.NCR3$Extensao, D.NCR2$Extensao, D.R4$Extensao, D.R2$Extensao)
-  
-  ,icc.kappa1(AV1.2.B$Comp.x, AV1.2.B$Comp.y)
-  ,icc.kappa3(D.NCR3$Comp, D.NCR2$Comp, D.R4$Comp, D.R2$Comp)
-  
-  ,icc.kappa1(AV1.2.B$Total.x, AV1.2.B$Total.y)
-  ,icc.kappa3(D.NCR3$Total, D.NCR2$Total, D.R4$Total, D.R2$Total))
-
-###===========
-### Correla??o
-###===========
-
-D1.GAB <- Dados %>% filter(Avaliacao=="AV1"&Avaliador=="GABARITO")
-D1.NCR3 <- Dados %>% filter(Avaliacao=="AV1"&Avaliador=="NCR3")
-D1.NCR2 <- Dados %>% filter(Avaliacao=="AV1"&Avaliador=="NCR2")
-D1.R4 <- Dados %>% filter(Avaliacao=="AV1"&Avaliador=="R4")
-D1.R3 <- Dados %>% filter(Avaliacao=="AV1"&Avaliador=="R3")
-D1.R2 <- Dados %>% filter(Avaliacao=="AV1"&Avaliador=="R2")
-D1.R1 <- Dados %>% filter(Avaliacao=="AV1"&Avaliador=="R1")
-
-D2.GAB <- Dados %>% filter(Avaliacao=="AV2"&Avaliador=="GABARITO")
-D2.NCR3 <- Dados %>% filter(Avaliacao=="AV2"&Avaliador=="NCR3")
-D2.NCR2 <- Dados %>% filter(Avaliacao=="AV2"&Avaliador=="NCR2")
-D2.R4 <- Dados %>% filter(Avaliacao=="AV2"&Avaliador=="R4")
-D2.R3 <- Dados %>% filter(Avaliacao=="AV2"&Avaliador=="R3")
-D2.R2 <- Dados %>% filter(Avaliacao=="AV2"&Avaliador=="R2")
-D2.R1 <- Dados %>% filter(Avaliacao=="AV2"&Avaliador=="R1")
-
-Corsup.T1 <- cbind(D1.NCR3$Superior, D1.NCR2$Superior, D1.R4$Superior, 
-                   D1.R3$Superior, D1.R2$Superior, D1.R1$Superior, D1.GAB$Superior)
-
-Corsup.T2 <- cbind(D2.NCR3$Superior, D2.NCR2$Superior, D2.R4$Superior, 
-                   D2.R3$Superior, D2.R2$Superior, D2.R1$Superior, D2.GAB$Superior)
-
-Corinf.T1 <- cbind(D1.NCR3$Inferior, D1.NCR2$Inferior, D1.R4$Inferior, 
-                   D1.R3$Inferior, D1.R2$Inferior, D1.R1$Inferior, D1.GAB$Inferior)
-
-Corinf.T2 <- cbind(D2.NCR3$Inferior, D2.NCR2$Inferior, D2.R4$Inferior, 
-                   D2.R3$Inferior, D2.R2$Inferior, D2.R1$Inferior, D2.GAB$Inferior)
-
-Corlat.T1 <- cbind(D1.NCR3$Lateral, D1.NCR2$Lateral, D1.R4$Lateral, 
-                   D1.R3$Lateral, D1.R2$Lateral, D1.R1$Lateral, D1.GAB$Lateral)
-
-Corlat.T2 <- cbind(D2.NCR3$Lateral, D2.NCR2$Lateral, D2.R4$Lateral, 
-                   D2.R3$Lateral, D2.R2$Lateral, D2.R1$Lateral, D2.GAB$Lateral)
-
-Cormes.T1 <- cbind(D1.NCR3$Mesencefalo, D1.NCR2$Mesencefalo, D1.R4$Mesencefalo, 
-                   D1.R3$Mesencefalo, D1.R2$Mesencefalo, D1.R1$Mesencefalo, D1.GAB$Mesencefalo)
-
-Cormes.T2 <- cbind(D2.NCR3$Mesencefalo, D2.NCR2$Mesencefalo, D2.R4$Mesencefalo, 
-                   D2.R3$Mesencefalo, D2.R2$Mesencefalo, D2.R1$Mesencefalo, D2.GAB$Mesencefalo)
-
-Corpb.T1 <- cbind(D1.NCR3$Ponte.Bulbo, D1.NCR2$Ponte.Bulbo, D1.R4$Ponte.Bulbo, 
-                   D1.R3$Ponte.Bulbo, D1.R2$Ponte.Bulbo, D1.R1$Ponte.Bulbo, D1.GAB$Ponte.Bulbo)
-
-Corpb.T2 <- cbind(D2.NCR3$Ponte.Bulbo, D2.NCR2$Ponte.Bulbo, D2.R4$Ponte.Bulbo, 
-                   D2.R3$Ponte.Bulbo, D2.R2$Ponte.Bulbo, D2.R1$Ponte.Bulbo, D2.GAB$Ponte.Bulbo)
-
-Corcer.T1 <- cbind(D1.NCR3$Cerebelo, D1.NCR2$Cerebelo, D1.R4$Cerebelo, 
-                   D1.R3$Cerebelo, D1.R2$Cerebelo, D1.R1$Cerebelo, D1.GAB$Cerebelo)
-
-Corcer.T2 <- cbind(D2.NCR3$Cerebelo, D2.NCR2$Cerebelo, D2.R4$Cerebelo, 
-                   D2.R3$Cerebelo, D2.R2$Cerebelo, D2.R1$Cerebelo, D2.GAB$Cerebelo)
-
-Corext.T1 <- cbind(D1.NCR3$Extensao, D1.NCR2$Extensao, D1.R4$Extensao, 
-                   D1.R3$Extensao, D1.R2$Extensao, D1.R1$Extensao, D1.GAB$Extensao)
-
-Corext.T2 <- cbind(D2.NCR3$Extensao, D2.NCR2$Extensao, D2.R4$Extensao, 
-                   D2.R3$Extensao, D2.R2$Extensao, D2.R1$Extensao, D2.GAB$Extensao)
-
-Corcom.T1 <- cbind(D1.NCR3$Comp, D1.NCR2$Comp, D1.R4$Comp, 
-                   D1.R3$Comp, D1.R2$Comp, D1.R1$Comp, D1.GAB$Comp)
-
-Corcom.T2 <- cbind(D2.NCR3$Comp, D2.NCR2$Comp, D2.R4$Comp, 
-                   D2.R3$Comp, D2.R2$Comp, D2.R1$Comp, D2.GAB$Comp)
-
-Cortot.T1 <- cbind(D1.NCR3$Total, D1.NCR2$Total, D1.R4$Total, 
-                   D1.R3$Total, D1.R2$Total, D1.R1$Total, D1.GAB$Total)
-
-Cortot.T2 <- cbind(D2.NCR3$Total, D2.NCR2$Total, D2.R4$Total, 
-                   D2.R3$Total, D2.R2$Total, D2.R1$Total, D2.GAB$Total)
-
-rbind(
-cbind(
-(rcorr(Corsup.T1, type="spearman")$r[,7])[-7]
-,(rcorr(Corsup.T1, type="spearman")$P[,7])[-7]
-,(rcorr(Corsup.T2, type="spearman")$r[,7])[-7]
-,(rcorr(Corsup.T2, type="spearman")$P[,7])[-7]),
-
-cbind(
-  (rcorr(Corinf.T1, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corinf.T1, type="spearman")$P[,7])[-7]
-  ,(rcorr(Corinf.T2, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corinf.T2, type="spearman")$P[,7])[-7]),
-
-cbind(
-  (rcorr(Corlat.T1, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corlat.T1, type="spearman")$P[,7])[-7]
-  ,(rcorr(Corlat.T2, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corlat.T2, type="spearman")$P[,7])[-7]),
-
-cbind(
-  (rcorr(Cormes.T1, type="spearman")$r[,7])[-7]
-  ,(rcorr(Cormes.T1, type="spearman")$P[,7])[-7]
-  ,(rcorr(Cormes.T2, type="spearman")$r[,7])[-7]
-  ,(rcorr(Cormes.T2, type="spearman")$P[,7])[-7]),
-
-cbind(
-  (rcorr(Corpb.T1, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corpb.T1, type="spearman")$P[,7])[-7]
-  ,(rcorr(Corpb.T2, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corpb.T2, type="spearman")$P[,7])[-7]),
-
-cbind(
-  (rcorr(Corcer.T1, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corcer.T1, type="spearman")$P[,7])[-7]
-  ,(rcorr(Corcer.T2, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corcer.T2, type="spearman")$P[,7])[-7]),
-
-cbind(
-  (rcorr(Corext.T1, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corext.T1, type="spearman")$P[,7])[-7]
-  ,(rcorr(Corext.T2, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corext.T2, type="spearman")$P[,7])[-7]),
-
-cbind(
-  (rcorr(Corcom.T1, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corcom.T1, type="spearman")$P[,7])[-7]
-  ,(rcorr(Corcom.T2, type="spearman")$r[,7])[-7]
-  ,(rcorr(Corcom.T2, type="spearman")$P[,7])[-7]),
-
-cbind(
-  (rcorr(Cortot.T1, type="spearman")$r[,7])[-7]
-  ,(rcorr(Cortot.T1, type="spearman")$P[,7])[-7]
-  ,(rcorr(Cortot.T2, type="spearman")$r[,7])[-7]
-  ,(rcorr(Cortot.T2, type="spearman")$P[,7])[-7]))
-
-
-
-
-
-
-
-
-
+Tabela1 = do.call(rbind,dados_codificados %>% select(País,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14,Q15) %>% map(DescritivaCat))
+Tabela2 = do.call(rbind,dados_codificados %>% select(Q16,Q17,Q18,Q19,Q20,Q21,Q22,Q23,Q24,Q25,Q26,Q27) %>% map(DescritivaCat))
+Tabela3 = do.call(rbind,dados_codificados %>% select(Q28,Q29,Q30,Q31,Q32,Q33,Q34,Q35,Q36,Q37,Q38,Q39,Q40,Q41,Q42,Q43,Q44,Q45,Q46,Q47,Q48,Q49,
+                                                     Q50,Q51,Q52,Q53,Q54,Q55,Q56,Q57,Q58,Q59,Q60,Q61,Q62) %>% map(DescritivaCat))
+write.xlsx(Tabela1 %>% as.data.frame(),'Tabela 1.xlsx', rowNames = T)
+write.xlsx(Tabela2 %>% as.data.frame(),'Tabela 2.xlsx', rowNames = T)
+write.xlsx(Tabela3 %>% as.data.frame(),'Tabela 3.xlsx', rowNames = T)
