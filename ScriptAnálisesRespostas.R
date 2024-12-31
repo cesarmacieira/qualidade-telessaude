@@ -590,7 +590,7 @@ Tabela8 = do.call(rbind,dados_ind %>% select(Planejamento_Servico,Gestao_Riscos,
 dados_ind %>% select(Planejamento_Servico,Gestao_Riscos,Gestao_Tecnologia,Geral) %>% map(TesteDeNormalidade)
 Tabela8.1 = rbind(AnovaIndepTeste(dados_ind$Planejamento_Servico,dados_ind$País)$tabela,
                   KruskalTeste(dados_ind$Gestao_Riscos,dados_ind$País)$tabela,
-                  KruskalTeste(dados_ind$Gestao_Tecnologia,dados_ind$País)$tabela,
+                  AnovaIndepTeste(dados_ind$Gestao_Tecnologia,dados_ind$País)$tabela,
                   AnovaIndepTeste(dados_ind$Geral,dados_ind$País)$tabela)
 #write.xlsx(Tabela8.1 %>% as.data.frame(),'Tabela 8.1.xlsx', rowNames = T)
 
