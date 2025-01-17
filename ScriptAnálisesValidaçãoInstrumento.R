@@ -372,8 +372,8 @@ icc.kappa3 <- function(x, y, z, w){
 ####=============================
 dados = tryCatch({read.xlsx("C:/Users/cesar_macieira/Desktop/Usiminas/Nescon/qualidade-telessaude/questionário para avaliadores final.xlsx", sheet = 3)},
                  error = function(e) {read.xlsx("D:/NESCON/Trabalho - Mariana/qualidade-telessaude/questionário para avaliadores final.xlsx", sheet = 3)})
-dados_relevancia = dados %>% filter(Tipo.de.avaliação == 'Relevância')
-dados_clareza = dados %>% filter(Tipo.de.avaliação == 'Clareza')
+dados_relevancia = dados %>% filter(Tipo.de.avaliação == 'Relevância') %>% as.data.frame()
+dados_clareza = dados %>% filter(Tipo.de.avaliação == 'Clareza') %>% as.data.frame()
 
 ####======================
 #### Validade de conteúdo
@@ -433,6 +433,31 @@ cat("\nS-IVC Clareza:", s_ivc_clareza, "\n")
 cat("\nResultados gerais:\n")
 print(resultados_geral)
 cat("\nS-IVC geral:", s_ivc_geral, "\n")
+
+####==============
+#### Concordância
+####==============
+require(irr)
+kappa2(cbind(dados$J1, dados$J2), weight = "squared")
+kappa2(cbind(dados$J1, dados$J2), weight = "squared")
+kappa2(cbind(dados$J1, dados$J3), weight = "squared")
+kappa2(cbind(dados$J1, dados$J4), weight = "squared")
+kappa2(cbind(dados$J1, dados$J5), weight = "squared")
+kappa2(cbind(dados$J1, dados$J6), weight = "squared")
+
+kappa2(cbind(dados$J2, dados$J3), weight = "squared")
+kappa2(cbind(dados$J2, dados$J4), weight = "squared")
+kappa2(cbind(dados$J2, dados$J5), weight = "squared")
+kappa2(cbind(dados$J2, dados$J6), weight = "squared")
+
+kappa2(cbind(dados$J3, dados$J4), weight = "squared")
+kappa2(cbind(dados$J3, dados$J5), weight = "squared")
+kappa2(cbind(dados$J3, dados$J6), weight = "squared")
+
+kappa2(cbind(dados$J4, dados$J5), weight = "squared")
+kappa2(cbind(dados$J4, dados$J6), weight = "squared")
+
+kappa2(cbind(dados$J5, dados$J6), weight = "squared")
 
 ####================
 #### Confiabilidade
